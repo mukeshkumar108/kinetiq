@@ -40,7 +40,34 @@ Current status:
 - Resolves effective entitlements from subscription records.
 - `/api/v1/me` includes normalized subscription state (`isPro`, `plan`, `status`).
 
+### Habits
+- `src/modules/habits/*`
+- Recurring habit CRUD with daily completion semantics.
+- Completion history lives in `HabitCompletion`; streak projection lives in `HabitStreak`.
+
+### Tasks
+- `src/modules/tasks/*`
+- One-off todo/task CRUD with explicit `open|completed` status.
+
+### Completions
+- `src/modules/completions/*`
+- Transactional completion/reversal flows for habits and tasks.
+- Habit completion: writes completion, recomputes streak, grants XP, evaluates achievements.
+- Task completion: updates task state, grants XP, evaluates achievements.
+
+### Progression
+- `src/modules/progression/*`
+- XP ledger is source of truth (`XpLedgerEntry`).
+- `ProgressionProfile` is a projection (`level`, `totalXp`, `currentLevelXp`, `nextLevelXp`).
+
+### Achievements
+- `src/modules/achievements/*`
+- Definition table + user unlock table.
+- Unlocking is idempotent via unique `(userId, achievementDefinitionId)`.
+
 ## Data Model Highlights
 - `User` is canonical application user.
 - `Device` tracks client device tokens and metadata.
 - `Subscription` stores source/status history; entitlements are derived in service layer.
+- `HabitCompletion` and `XpLedgerEntry` are source-of-truth history tables.
+- `HabitStreak` and `ProgressionProfile` are projection tables.

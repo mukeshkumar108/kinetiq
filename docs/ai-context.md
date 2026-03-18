@@ -10,6 +10,11 @@ This repo is the mobile-first backend for the Kinetiq habits/todos app.
 - Devices: idempotent token registration via `/api/v1/devices`
 - Notifications: preference-read foundation only
 - Subscriptions: entitlement resolution (`isPro`, `plan`, `status`) integrated into `/api/v1/me`
+- Habits: CRUD + complete/uncomplete with local-day completion history
+- Tasks: CRUD + complete/reopen
+- Streaks: projection recomputed from habit completion history
+- Progression: XP ledger source-of-truth + profile projection
+- Achievements: seeded definitions + idempotent unlocks
 
 ## Rules for Future Changes
 - Keep route handlers thin; put logic in module services.

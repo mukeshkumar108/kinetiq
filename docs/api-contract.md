@@ -81,6 +81,42 @@ Request:
 }
 ```
 
+## Habits
+
+- `GET /api/v1/habits`
+- `POST /api/v1/habits`
+- `GET /api/v1/habits/:id`
+- `PATCH /api/v1/habits/:id`
+- `DELETE /api/v1/habits/:id`
+- `POST /api/v1/habits/:id/complete`
+- `POST /api/v1/habits/:id/uncomplete`
+
+Habit completion response includes:
+- completion metadata (`localDate`, `timezone`, `completedAt`)
+- streak projection (`current`, `longest`)
+- progression projection (`level`, `totalXp`, `currentLevelXp`, `nextLevelXp`)
+- newly unlocked achievements (if any)
+
+## Tasks
+
+- `GET /api/v1/tasks`
+- `POST /api/v1/tasks`
+- `GET /api/v1/tasks/:id`
+- `PATCH /api/v1/tasks/:id`
+- `DELETE /api/v1/tasks/:id`
+- `POST /api/v1/tasks/:id/complete`
+- `POST /api/v1/tasks/:id/reopen`
+
+Task completion response includes updated task, granted XP, progression projection, and unlocked achievements.
+
+## Progression and Achievements
+
+- `GET /api/v1/progression`
+- `GET /api/v1/achievements`
+- `GET /api/v1/today`
+
+`/api/v1/today` supports optional `timezone` query param and returns today-local snapshot across habits and tasks.
+
 Response:
 
 ```json

@@ -34,6 +34,29 @@ enum SubscriptionSource {
   manual
 }
 
+enum HabitFrequency {
+  daily
+}
+
+enum TaskStatus {
+  open
+  completed
+}
+
+enum XpSource {
+  habit_completion
+  task_completion
+  achievement_unlock
+  adjustment
+}
+
+enum AchievementMetric {
+  longest_habit_streak
+  total_habit_completions
+  total_task_completions
+  total_xp
+}
+
 model User {
   id                    String   @id @default(cuid())
   clerkUserId           String   @unique
@@ -53,6 +76,13 @@ model User {
   updatedAt             DateTime @updatedAt
   devices               Device[]
   subscriptions         Subscription[]
+  habits                Habit[]
+  habitCompletions      HabitCompletion[]
+  habitStreaks          HabitStreak[]
+  tasks                 Task[]
+  progressionProfile    ProgressionProfile?
+  xpLedgerEntries       XpLedgerEntry[]
+  userAchievements      UserAchievement[]
 
   @@index([email])
 }
@@ -83,4 +113,120 @@ model Subscription {
   updatedAt        DateTime           @updatedAt
 
   @@index([userId])
+}
+
+model Habit {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  color       String?
+  timezone    String?
+  frequency   HabitFrequency    @default(daily)
+  isArchived  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  completions HabitCompletion[]
+  streak      HabitStreak?
+
+  @@index([userId, isArchived])
+}
+
+model HabitCompletion {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId    String
+  habit      Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  localDate  String
+  timezone   String
+  completedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, habitId, localDate])
+  @@index([userId, localDate])
+  @@index([habitId, completedAt])
+}
+
+model HabitStreak {
+  id                    String   @id @default(cuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId               String   @unique
+  habit                 Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  currentStreak         Int      @default(0)
+  longestStreak         Int      @default(0)
+  lastCompletedLocalDate String?
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueAt       DateTime?
+  status      TaskStatus @default(open)
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, dueAt])
+}
+
+model ProgressionProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level         Int      @default(1)
+  totalXp       Int      @default(0)
+  currentLevelXp Int     @default(0)
+  nextLevelXp   Int      @default(100)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model XpLedgerEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int
+  source      XpSource
+  referenceId String?
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, source])
+  @@index([source, referenceId])
+}
+
+model AchievementDefinition {
+  id          String            @id @default(cuid())
+  code        String            @unique
+  title       String
+  description String
+  metric      AchievementMetric
+  threshold   Int
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id                      String                @id @default(cuid())
+  userId                  String
+  user                    User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementDefinitionId String
+  definition              AchievementDefinition @relation(fields: [achievementDefinitionId], references: [id], onDelete: Cascade)
+  unlockedAt              DateTime              @default(now())
+
+  @@unique([userId, achievementDefinitionId])
+  @@index([userId, unlockedAt])
 }
