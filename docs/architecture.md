@@ -1,13 +1,17 @@
 # Architecture
 
 ## Overview
-This is a mobile-first, headless backend starter built on Next.js App Router, Clerk auth, and Prisma/Postgres.
+This is a mobile-first backend for the Kinetiq habits/todos app, built on Next.js App Router, Clerk auth, and Prisma/Postgres.
 
 Core principles:
 - thin route handlers
 - service-layer business/data logic
 - canonical DB `User`
 - stable JSON API contracts
+
+Current status:
+- Core identity/device/subscription foundation is implemented.
+- Habits/todos domain modules are the next product layer on top of this baseline.
 
 ## Modules
 
@@ -28,7 +32,7 @@ Core principles:
 
 ### Notifications
 - `src/modules/notifications/*`
-- Foundation-only in this phase: reads notification preferences from user preferences.
+- Foundation-only currently: reads notification preferences from user preferences.
 - No push delivery infrastructure yet.
 
 ### Subscriptions

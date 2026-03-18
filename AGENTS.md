@@ -1,19 +1,14 @@
 # AGENTS.md
 
 ## Purpose
-This repository is a **mobile-first, headless backend starter** for consumer React Native apps.
+This repository is the **mobile-first backend for the Kinetiq habits and todos app**.
 
 ## What This Repo Is
-- Next.js App Router backend scaffold
+- Next.js App Router backend for a habits/todos product
 - Versioned app API foundation (`/api/v1/*`)
 - Clerk-based authentication with bearer-token friendly API access
 - Prisma/Postgres persistence with a canonical application `User`
 - Zod-driven request/env validation
-
-## What This Repo Is Not
-- Not a product-specific app backend
-- Not a place to add domain-specific models (habits, todos, journaling, coaching, etc.) unless explicitly requested in phase scope
-- Not an org/admin/roles platform baseline
 
 ## Architecture Rules
 - Keep route handlers thin: parse/validate input, call service, return response.
@@ -31,7 +26,8 @@ This repository is a **mobile-first, headless backend starter** for consumer Rea
 - Avoid browser-only assumptions in app-facing APIs.
 
 ## Change Discipline
-- Make minimal, phase-scoped changes.
+- Make minimal, iteration-scoped changes.
 - Do not add new domains outside explicit scope.
+- Prioritize habits/todos domain incrementally with stable contracts.
 - Update `CHANGELOG.md` for any meaningful change set.
 - Future agents should read `AGENTS.md` and `CHANGELOG.md` before substantial edits.

@@ -1,7 +1,7 @@
 # AI Context
 
 ## Purpose
-This repo is a reusable, opinionated, mobile-first backend starter for React Native apps.
+This repo is the mobile-first backend for the Kinetiq habits/todos app.
 
 ## Current Foundation
 - Auth: Clerk + bearer-token friendly `authGuard`
@@ -15,5 +15,5 @@ This repo is a reusable, opinionated, mobile-first backend starter for React Nat
 - Keep route handlers thin; put logic in module services.
 - Preserve shared API response shape.
 - Use Zod for validation.
-- Avoid product-specific domains unless explicitly requested.
+- Build habits/todos scope incrementally; avoid unrelated domains unless explicitly requested.
 - Update `CHANGELOG.md` for meaningful changes.
