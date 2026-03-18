@@ -200,15 +200,23 @@ export async function completeTask(userId: string, taskId: string) {
   await seedAchievementDefinitions();
 
   return prisma.$transaction(async (tx) => {
-    const task = await tx.task.findFirst({ where: { id: taskId, userId } });
-    if (!task) {
-      throw new DomainError(404, "TASK_NOT_FOUND", "task not found");
-    }
+    const updated = await tx.task.updateMany({
+      where: { id: taskId, userId, status: "open" },
+      data: {
+        status: "completed",
+        completedAt: new Date(),
+      },
+    });
 
-    if (task.status === "completed") {
+    if (updated.count === 0) {
+      const existingTask = await tx.task.findFirst({ where: { id: taskId, userId } });
+      if (!existingTask) {
+        throw new DomainError(404, "TASK_NOT_FOUND", "task not found");
+      }
+
       const progression = await tx.progressionProfile.findUnique({ where: { userId } });
       return {
-        task: toTaskDTO(task),
+        task: toTaskDTO(existingTask),
         progression: {
           level: progression?.level ?? 1,
           totalXp: progression?.totalXp ?? 0,
@@ -220,12 +228,8 @@ export async function completeTask(userId: string, taskId: string) {
       };
     }
 
-    const completedTask = await tx.task.update({
-      where: { id: task.id },
-      data: {
-        status: "completed",
-        completedAt: new Date(),
-      },
+    const completedTask = await tx.task.findUniqueOrThrow({
+      where: { id: taskId },
     });
 
     const [progression, unlockedAchievements] = await Promise.all([
@@ -233,8 +237,8 @@ export async function completeTask(userId: string, taskId: string) {
         userId,
         amount: TASK_COMPLETION_XP,
         source: "task_completion",
-        referenceId: task.id,
-        metadata: { taskId: task.id },
+        referenceId: taskId,
+        metadata: { taskId },
       }),
       evaluateAchievementsTx(tx, userId),
     ]);
@@ -259,15 +263,23 @@ export async function completeTask(userId: string, taskId: string) {
 
 export async function reopenTask(userId: string, taskId: string) {
   return prisma.$transaction(async (tx) => {
-    const task = await tx.task.findFirst({ where: { id: taskId, userId } });
-    if (!task) {
-      throw new DomainError(404, "TASK_NOT_FOUND", "task not found");
-    }
+    const updated = await tx.task.updateMany({
+      where: { id: taskId, userId, status: "completed" },
+      data: {
+        status: "open",
+        completedAt: null,
+      },
+    });
 
-    if (task.status === "open") {
+    if (updated.count === 0) {
+      const existingTask = await tx.task.findFirst({ where: { id: taskId, userId } });
+      if (!existingTask) {
+        throw new DomainError(404, "TASK_NOT_FOUND", "task not found");
+      }
+
       const progression = await tx.progressionProfile.findUnique({ where: { userId } });
       return {
-        task: toTaskDTO(task),
+        task: toTaskDTO(existingTask),
         progression: {
           level: progression?.level ?? 1,
           totalXp: progression?.totalXp ?? 0,
@@ -277,18 +289,14 @@ export async function reopenTask(userId: string, taskId: string) {
       };
     }
 
-    const reopenedTask = await tx.task.update({
-      where: { id: task.id },
-      data: {
-        status: "open",
-        completedAt: null,
-      },
+    const reopenedTask = await tx.task.findUniqueOrThrow({
+      where: { id: taskId },
     });
 
     const progression = await removeXpEntriesForReferenceTx(tx, {
       userId,
       source: XpSource.task_completion,
-      referenceId: task.id,
+      referenceId: taskId,
     });
 
     return {

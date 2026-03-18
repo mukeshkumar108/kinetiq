@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "@/lib/prisma";
-import { completeHabit, completeTask } from "@/modules/completions/completions.service";
+import { completeHabit, completeTask, reopenTask, uncompleteHabit } from "@/modules/completions/completions.service";
+import { grantXpTx, removeXpEntriesForReferenceTx } from "@/modules/progression/progression.service";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -53,10 +54,14 @@ vi.mock("@/modules/tasks/tasks.service", () => ({
 }));
 
 const transactionMock = vi.mocked(prisma.$transaction);
+const grantXpTxMock = vi.mocked(grantXpTx);
+const removeXpEntriesMock = vi.mocked(removeXpEntriesForReferenceTx);
 
 describe("completions.service", () => {
   beforeEach(() => {
     transactionMock.mockReset();
+    grantXpTxMock.mockClear();
+    removeXpEntriesMock.mockClear();
   });
 
   it("completing a habit creates completion and progression payload", async () => {
@@ -117,21 +122,57 @@ describe("completions.service", () => {
     });
   });
 
+  it("uncomplete habit removes completion and XP projection", async () => {
+    const tx = {
+      habit: {
+        findFirst: vi.fn(async () => ({ id: "habit_1", timezone: "UTC" })),
+      },
+      user: {
+        findUnique: vi.fn(async () => ({ timezone: "UTC" })),
+      },
+      habitCompletion: {
+        findUnique: vi.fn(async () => ({ id: "hc_1" })),
+        delete: vi.fn(async () => undefined),
+      },
+    };
+
+    transactionMock.mockImplementation(async (fn) => fn(tx as never));
+
+    const result = await uncompleteHabit("user_1", "habit_1", { timezone: "UTC" });
+
+    expect(tx.habitCompletion.delete).toHaveBeenCalledWith({ where: { id: "hc_1" } });
+    expect(removeXpEntriesMock).toHaveBeenCalled();
+    expect(result.removedLocalDate).toBe("2026-03-18");
+  });
+
+  it("prevent completing archived or other-user habit", async () => {
+    const tx = {
+      habit: {
+        findFirst: vi.fn(async () => null),
+      },
+      user: {
+        findUnique: vi.fn(async () => ({ timezone: "UTC" })),
+      },
+      habitCompletion: {
+        create: vi.fn(),
+      },
+    };
+
+    transactionMock.mockImplementation(async (fn) => fn(tx as never));
+
+    await expect(completeHabit("user_1", "habit_2", { timezone: "UTC" })).rejects.toMatchObject({
+      code: "HABIT_NOT_FOUND",
+      status: 404,
+    });
+    expect(tx.habitCompletion.create).not.toHaveBeenCalled();
+  });
+
   it("task completion grants XP", async () => {
     const now = new Date("2026-03-18T10:00:00.000Z");
     const tx = {
       task: {
-        findFirst: vi.fn(async () => ({
-          id: "task_1",
-          title: "Do it",
-          description: null,
-          dueAt: null,
-          status: "open",
-          completedAt: null,
-          createdAt: now,
-          updatedAt: now,
-        })),
-        update: vi.fn(async () => ({
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        findUniqueOrThrow: vi.fn(async () => ({
           id: "task_1",
           title: "Do it",
           description: null,
@@ -149,7 +190,82 @@ describe("completions.service", () => {
     const result = await completeTask("user_1", "task_1");
 
     expect(result.grantedXp).toBe(25);
-    expect(tx.task.update).toHaveBeenCalled();
-    expect(result.task.status).toBe("completed");
+    expect(tx.task.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: "open" }) }),
+    );
+    expect(grantXpTxMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("prevent double completion rewards", async () => {
+    const now = new Date("2026-03-18T10:00:00.000Z");
+    const tx = {
+      task: {
+        updateMany: vi.fn(async () => ({ count: 0 })),
+        findFirst: vi.fn(async () => ({
+          id: "task_1",
+          title: "Do it",
+          description: null,
+          dueAt: null,
+          status: "completed",
+          completedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      },
+      progressionProfile: {
+        findUnique: vi.fn(async () => ({
+          level: 1,
+          totalXp: 10,
+          currentLevelXp: 10,
+          nextLevelXp: 100,
+        })),
+      },
+    };
+
+    transactionMock.mockImplementation(async (fn) => fn(tx as never));
+
+    const result = await completeTask("user_1", "task_1");
+
+    expect(result.grantedXp).toBe(0);
+    expect(grantXpTxMock).not.toHaveBeenCalled();
+  });
+
+  it("reopen task revokes XP and prevents acting on other-user task", async () => {
+    const now = new Date("2026-03-18T10:00:00.000Z");
+
+    const txSuccess = {
+      task: {
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        findUniqueOrThrow: vi.fn(async () => ({
+          id: "task_1",
+          title: "Do it",
+          description: null,
+          dueAt: null,
+          status: "open",
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      },
+    };
+
+    transactionMock.mockImplementationOnce(async (fn) => fn(txSuccess as never));
+    const reopened = await reopenTask("user_1", "task_1");
+    expect(reopened.task.status).toBe("open");
+    expect(removeXpEntriesMock).toHaveBeenCalledTimes(1);
+
+    const txMissing = {
+      task: {
+        updateMany: vi.fn(async () => ({ count: 0 })),
+        findFirst: vi.fn(async () => null),
+      },
+    };
+
+    transactionMock.mockImplementationOnce(async (fn) => fn(txMissing as never));
+
+    await expect(reopenTask("user_1", "task_2")).rejects.toMatchObject({
+      code: "TASK_NOT_FOUND",
+      status: 404,
+    });
   });
 });
